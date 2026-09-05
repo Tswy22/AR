@@ -1,120 +1,118 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>AR เครื่องซักผ้า (Washing Machine)</title>
-    <!-- นำเข้า A-Frame และ AR.js -->
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR เลือกวางเฟอร์นิเจอร์</title>
+  
+  <!-- นำเข้าไลบรารี model-viewer ของ Google -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+  
+  <style>
+    body { margin: 0; padding: 0; background-color: #f4f4f4; font-family: sans-serif; overflow: hidden; }
     
-    <style>
-      /* ตกแต่งปุ่มกด UI ให้ทับอยู่บนกล้อง */
-      .ui-container {
-        position: absolute;
-        bottom: 30px;
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        z-index: 10;
-        pointer-events: none; /* ให้คลิกทะลุได้ยกเว้นที่ปุ่ม */
-      }
-      button {
-        pointer-events: auto;
-        padding: 15px 40px;
-        font-size: 24px;
-        font-weight: bold;
-        background-color: #28a745;
-        color: white;
-        border: 3px solid #ffffff;
-        border-radius: 50px;
-        cursor: pointer;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        transition: transform 0.1s, background-color 0.3s;
-      }
-      button:active {
-        transform: scale(0.95);
-        background-color: #218838;
-      }
-    </style>
-
-    <script>
-      let currentSpeed = 1;
-      
-      // สร้าง Component สำหรับหมุนถังซัก
-      AFRAME.registerComponent('spin-drum', {
-        schema: { speed: {type: 'number', default: 1} },
-        tick: function (time, timeDelta) {
-          // ดึงค่าการหมุนปัจจุบัน
-          let rotation = this.el.getAttribute('rotation');
-          // เพิ่มค่าการหมุนแกน Z ตามความเร็ว (จำลองถังซักฝาหน้า)
-          rotation.z += this.data.speed * (timeDelta / 10); 
-          this.el.setAttribute('rotation', rotation);
-        }
-      });
-
-      // ฟังก์ชันเมื่อกดปุ่มเปลี่ยนความเร็ว
-      function changeSpeed() {
-        currentSpeed += 3; // เพิ่มความเร็วทีละ 3
-        if (currentSpeed > 10) {
-          currentSpeed = 1; // ถ้ารอบสูงเกินให้กลับมาเริ่มต้น (โหมดซักปกติ)
-        }
-        
-        const drum = document.querySelector('#drum');
-        // อัปเดตค่าความเร็วใน component
-        drum.setAttribute('spin-drum', `speed: ${currentSpeed}`);
-        
-        // เปลี่ยนข้อความปุ่ม
-        let speedText = currentSpeed === 1 ? 'ซักปกติ (1x)' : `ปั่นหมาด (${currentSpeed}x)`;
-        document.getElementById('speed-btn').innerText = speedText;
-      }
-    </script>
-  </head>
-  <body style="margin: 0; overflow: hidden; font-family: sans-serif;">
+    /* ตั้งค่าตัวแสดงผล 3D ให้เต็มจอ */
+    model-viewer {
+      width: 100vw;
+      height: 100vh;
+      background-color: #e0e0e0;
+    }
     
-    <!-- ปุ่ม UI ปรับความเร็ว -->
-    <div class="ui-container">
-      <button id="speed-btn" onclick="changeSpeed()">ซักปกติ (1x)</button>
-    </div>
+    /* เมนูเลือกสินค้าด้านล่าง */
+    .product-selector {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 15px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      z-index: 10;
+    }
 
-    <!-- สร้าง Scene AR -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
-      
-      <!-- ใช้ Marker มาตรฐาน Hiro -->
-      <a-marker preset="hiro">
-        
-        <!-- โมเดลเครื่องซักผ้า (สร้างจากรูปทรงพื้นฐาน) -->
-        <a-entity position="0 0.5 0" rotation="-90 0 0">
-          <!-- ตัวเครื่องภายนอก (สีขาว) -->
-          <a-box position="0 0 0" depth="1" height="1.2" width="1" color="#F4F4F4" shadow></a-box>
-          
-          <!-- แผงควบคุมด้านบน (สีดำ) -->
-          <a-box position="0 0.5 0.45" depth="0.1" height="0.1" width="0.9" color="#222222"></a-box>
-          <a-cylinder position="-0.3 0.5 0.5" rotation="90 0 0" radius="0.03" height="0.05" color="red"></a-cylinder>
-          <a-cylinder position="-0.15 0.5 0.5" rotation="90 0 0" radius="0.03" height="0.05" color="blue"></a-cylinder>
+    .product-btn {
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      background-color: #fff;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
 
-          <!-- กรอบฝาหน้าเครื่องซักผ้า -->
-          <a-torus position="0 0 0.5" rotation="0 0 0" radius="0.36" radius-tubular="0.03" color="#CCCCCC"></a-torus>
-          
-          <!-- กระจกฝาหน้า (ใส) -->
-          <a-cylinder position="0 0 0.5" rotation="90 0 0" radius="0.35" height="0.02" color="#87CEEB" opacity="0.6"></a-cylinder>
-          
-          <!-- ถังซักด้านในที่หมุนได้ (ใส่ลวดลายให้เห็นการหมุนชัดขึ้น) -->
-          <a-cylinder id="drum" 
-                      spin-drum="speed: 1" 
-                      position="0 0 0.4" 
-                      rotation="90 0 0" 
-                      radius="0.34" 
-                      height="0.8" 
-                      color="#AAAAAA"
-                      segments-radial="8"> <!-- ทำเป็น 8 เหลี่ยมจะเห็นการหมุนชัดเจน -->
-          </a-cylinder>
-        </a-entity>
-        
-      </a-marker>
+    .product-btn:active, .product-btn.active {
+      border-color: #007bff;
+      color: #007bff;
+      background-color: #eef6ff;
+    }
 
-      <!-- กล้อง AR -->
-      <a-entity camera></a-entity>
-    </a-scene>
+    /* ปุ่มกดเข้าสู่โหมด AR ของมือถือ */
+    .ar-button {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 30px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
 
-  </body>
+  <!-- 
+    ตัวแสดงผล AR: 
+    ar-modes="webxr scene-viewer quick-look" จะทำให้รองรับทั้ง Android และ iOS 
+  -->
+  <model-viewer 
+    id="furniture-viewer"
+    src="https://modelviewer.dev/shared-assets/models/chair.glb" 
+    ar 
+    ar-modes="webxr scene-viewer quick-look" 
+    camera-controls 
+    shadow-intensity="1"
+    shadow-softness="1"
+    alt="เฟอร์นิเจอร์ 3 มิติ">
+    
+    <!-- ปุ่มนี้จะแสดงขึ้นมาเมื่อเปิดเว็บด้วยมือถือที่รองรับ AR เท่านั้น -->
+    <button slot="ar-button" class="ar-button">
+      📸 ดูในพื้นที่จริง (AR)
+    </button>
+  </model-viewer>
+
+  <!-- UI เลือกสินค้า -->
+  <div class="product-selector">
+    <button class="product-btn active" onclick="changeProduct(this, 'https://modelviewer.dev/shared-assets/models/chair.glb')">
+      🪑 เก้าอี้ไม้
+    </button>
+    <button class="product-btn" onclick="changeProduct(this, 'https://modelviewer.dev/assets/ShopifyModels/GeoPlanter.glb')">
+      🪴 กระถางต้นไม้
+    </button>
+  </div>
+
+  <script>
+    // ฟังก์ชันเปลี่ยนโมเดลเมื่อกดปุ่ม
+    function changeProduct(btnElement, modelUrl) {
+      // เปลี่ยนไฟล์โมเดลใน model-viewer
+      const viewer = document.getElementById('furniture-viewer');
+      viewer.src = modelUrl;
+
+      // จัดการสีปุ่มที่ถูกเลือก
+      document.querySelectorAll('.product-btn').forEach(btn => btn.classList.remove('active'));
+      btnElement.classList.add('active');
+    }
+  </script>
+
+</body>
 </html>
