@@ -1,685 +1,171 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="mobile-web-app-capable" content="yes">
-<title>วางเครื่องซักผ้าในห้องจริง — AR เปิดกล้อง</title>
-<style>
-  :root{
-    --glass:rgba(12,22,20,.78);
-    --line:rgba(255,255,255,.16);
-    --mint:#38d6b0;
-    --amber:#f0ad4d;
-    --paper:#eef2ef;
-    --safe-b:env(safe-area-inset-bottom, 0px);
-    --safe-t:env(safe-area-inset-top, 0px);
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;overflow:hidden;background:#0b1210;color:var(--paper);
-    font-family:"Noto Sans Thai","Trebuchet MS",Tahoma,sans-serif;
-    -webkit-tap-highlight-color:transparent;touch-action:none;overscroll-behavior:none}
-  canvas{display:block}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR เลือกวางสินค้าเสมือนจริง</title>
+  
+  <!-- นำเข้าไลบรารี model-viewer สำหรับ AR ที่สมจริงที่สุด -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+  
+  <style>
+    :root {
+      --primary: #38d6b0;
+      --bg-dark: #0b1210;
+      --text-light: #eef2ef;
+    }
+    
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background-color: var(--bg-dark); 
+      font-family: "Noto Sans Thai", sans-serif; 
+      overflow: hidden; 
+    }
+    
+    /* ตัวแสดงผล 3D */
+    model-viewer {
+      width: 100vw;
+      height: 100vh;
+      background-color: #1a2522; /* สีพื้นหลังตอนดู 3D ปกติ */
+    }
+    
+    /* ปุ่มเข้าโหมด AR */
+    .ar-btn {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: var(--primary);
+      color: #052a22;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 30px;
+      box-shadow: 0 4px 15px rgba(56, 214, 176, 0.4);
+      cursor: pointer;
+      z-index: 10;
+    }
 
-  /* ภาพจากกล้อง (โหมด getUserMedia) */
-  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none;background:#000}
-  #cam.on{display:block}
-  #three{position:fixed;inset:0;z-index:1}
+    .ar-btn:active {
+      transform: translateX(-50%) scale(0.95);
+    }
 
-  #overlay{position:fixed;inset:0;pointer-events:none;z-index:5}
-  #overlay > *{pointer-events:auto}
+    /* เมนูเลือกสินค้าด้านล่าง */
+    .product-dock {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 10px;
+      background: rgba(12, 22, 20, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      z-index: 10;
+    }
 
-  #status{
-    position:absolute;top:calc(12px + var(--safe-t));left:50%;transform:translateX(-50%);
-    max-width:calc(100% - 24px);padding:9px 15px;border-radius:999px;
-    background:var(--glass);backdrop-filter:blur(8px);border:1px solid var(--line);
-    font-size:13px;line-height:1.45;text-align:center;transition:.3s
-  }
-  #status.hidden{opacity:0;transform:translateX(-50%) translateY(-10px)}
+    /* ซ่อน Scrollbar */
+    .product-dock::-webkit-scrollbar { display: none; }
 
-  #dock{
-    position:absolute;left:8px;right:8px;bottom:calc(8px + var(--safe-b));
-    background:var(--glass);backdrop-filter:blur(10px);
-    border:1px solid var(--line);border-radius:20px;padding:11px 11px 13px;display:none
-  }
-  #dock.on{display:block}
-  #dock.min > *:not(.size){display:none}
-  .size{display:flex;align-items:baseline;gap:9px;margin:0 2px 9px}
-  .size b{font-size:20px;font-variant-numeric:tabular-nums}
-  .size span{font-size:11.5px;opacity:.7}
-  .size button{margin-left:auto;padding:5px 10px;font-size:11.5px;border-radius:9px}
+    .product-card {
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 10px 15px;
+      color: var(--text-light);
+      font-size: 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.3s;
+    }
 
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-  .tools{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
-  button{
-    font-family:inherit;color:var(--paper);background:rgba(255,255,255,.07);
-    border:1px solid var(--line);border-radius:12px;padding:10px 5px;font-size:12px;cursor:pointer
-  }
-  button:active{background:rgba(255,255,255,.18)}
-  button[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#052a22;font-weight:700}
-  button:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
-
-  .finishes{display:flex;gap:8px;margin:9px 2px 0;align-items:center}
-  .finishes span{font-size:11.5px;opacity:.7}
-  .chip{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.25);padding:0}
-  .chip[aria-pressed="true"]{border-color:var(--mint);box-shadow:0 0 0 3px rgba(56,214,176,.25)}
-
-  .slide{display:flex;align-items:center;gap:9px;margin-top:9px}
-  .slide label{font-size:11.5px;opacity:.75;white-space:nowrap;min-width:70px}
-  .slide input{flex:1;accent-color:var(--mint);height:26px}
-  .slide output{font-size:12px;color:var(--mint);font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
-  #eyeRow{display:none}
-  #eyeRow.on{display:flex}
-
-  #intro{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;
-    background:linear-gradient(180deg,rgba(8,14,13,.35),rgba(8,14,13,.94) 55%)}
-  #intro.gone{display:none}
-  .card{width:min(520px,100%);margin:0 10px calc(10px + var(--safe-b));padding:20px 20px 22px;
-    background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:24px;
-    max-height:88vh;overflow:auto}
-  .card h1{margin:0 0 8px;font-size:20px;line-height:1.35}
-  .card p{margin:0 0 14px;font-size:13.5px;line-height:1.7;opacity:.86}
-  .card .go{width:100%;padding:14px;background:var(--mint);color:#052a22;border:none;
-    border-radius:14px;font-size:15.5px;font-weight:700;margin-bottom:8px}
-  .card .alt{width:100%;padding:12px;font-size:13.5px;margin-bottom:8px}
-  .card small{display:block;font-size:12px;opacity:.6;line-height:1.6;margin-top:6px}
-  .warn{border-left:3px solid var(--amber);padding-left:12px;margin-bottom:14px;font-size:13px;line-height:1.65}
-</style>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
+    .product-card.active {
+      background: rgba(56, 214, 176, 0.2);
+      border-color: var(--primary);
+      color: var(--primary);
+      font-weight: bold;
+    }
+    
+    /* ข้อความแนะนำด้านบน */
+    .status-bar {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(12, 22, 20, 0.8);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      z-index: 10;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+  </style>
 </head>
 <body>
 
-<video id="cam" playsinline muted autoplay></video>
+  <div class="status-bar">หมุนดูโมเดล หรือกดปุ่ม AR เพื่อส่องของจริง</div>
 
-<div id="overlay">
-  <div id="status">กำลังเตรียมระบบ</div>
+  <!-- 
+    ระบบ model-viewer
+    - environment-image="neutral": เพิ่มแสงสะท้อนระดับสตูดิโอให้โมเดลดูจริง
+    - shadow-intensity: เพิ่มความเข้มของเงาตกกระทบพื้น
+  -->
+  <model-viewer 
+    id="ar-viewer"
+    src="https://modelviewer.dev/shared-assets/models/Mixer.glb" 
+    ar 
+    ar-modes="webxr scene-viewer quick-look" 
+    camera-controls 
+    environment-image="neutral"
+    shadow-intensity="1.5"
+    shadow-softness="1"
+    exposure="1.2"
+    alt="สินค้า 3 มิติ">
+    
+    <button slot="ar-button" class="ar-btn">
+      📸 วางในพื้นที่จริง
+    </button>
+  </model-viewer>
 
-  <div id="dock">
-    <div class="size">
-      <b id="dim">60 × 60 × 85</b><span>ซม. · ขนาดจริง 1:1</span>
-      <button id="fold" aria-label="ย่อแผงควบคุม">ย่อ</button>
+  <!-- UI เลือกสินค้า (สามารถเพิ่มสินค้าได้ที่นี่) -->
+  <div class="product-dock" id="product-list">
+    <!-- ใส่ลิงก์ไฟล์ .glb ของสินค้าลงใน data-src -->
+    <div class="product-card active" data-src="https://modelviewer.dev/shared-assets/models/Mixer.glb">
+      เครื่องผสมอาหาร
     </div>
-
-    <div class="grid" id="models">
-      <button data-model="slim" aria-pressed="false">สลิม ลึก 45</button>
-      <button data-model="std"  aria-pressed="true">มาตรฐาน 60</button>
-      <button data-model="big"  aria-pressed="false">ถังใหญ่ 70</button>
+    <div class="product-card" data-src="https://modelviewer.dev/shared-assets/models/chair.glb">
+      เก้าอี้วินเทจ
     </div>
-
-    <div class="finishes" id="finishes">
-      <span>สีตัวเครื่อง</span>
-      <button class="chip" data-color="0xf3f5f6" aria-pressed="true"  style="background:#f3f5f6" aria-label="ขาว"></button>
-      <button class="chip" data-color="0x3b4348" aria-pressed="false" style="background:#3b4348" aria-label="เทาเข้ม"></button>
-      <button class="chip" data-color="0xb9bfc4" aria-pressed="false" style="background:#b9bfc4" aria-label="เงิน"></button>
-    </div>
-
-    <div class="tools">
-      <button id="rotL">↺ หมุน</button>
-      <button id="rotR">หมุน ↻</button>
-      <button id="door" aria-pressed="false">เปิดฝา</button>
-      <button id="reset">วางใหม่</button>
-    </div>
-
-    <div class="slide" id="eyeRow">
-      <label for="eye">ความสูงกล้อง</label>
-      <input id="eye" type="range" min="0.8" max="1.8" step="0.05" value="1.4">
-      <output id="eyeOut">1.40 ม.</output>
-    </div>
-
-    <div class="slide">
-      <label for="rpm">รอบปั่น</label>
-      <input id="rpm" type="range" min="0" max="1400" step="10" value="0">
-      <output id="rpmOut">0 รอบ/นาที</output>
+    <div class="product-card" data-src="https://modelviewer.dev/shared-assets/models/Shoe.glb">
+      รองเท้าผ้าใบ
     </div>
   </div>
-</div>
 
-<div id="intro">
-  <div class="card" id="introCard">
-    <h1>วางเครื่องซักผ้าลงในห้องจริง</h1>
-    <p>เปิดกล้องมือถือ ส่องไปที่พื้นห้อง แล้ววางเครื่องซักผ้าขนาดจริงลงไปเพื่อดูว่าพอดีกับมุมที่ตั้งใจไว้ไหม มีเส้นบอกพื้นที่ที่ต้องเผื่อและรัศมีการเปิดฝาให้ด้วย</p>
-    <div id="introButtons"></div>
-    <small id="introNote"></small>
-  </div>
-</div>
+  <script>
+    const viewer = document.getElementById('ar-viewer');
+    const products = document.querySelectorAll('.product-card');
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-const $ = s => document.querySelector(s);
-const DEG = Math.PI/180;
-
-/* =========================================================
-   ฉาก
-   ========================================================= */
-const scene    = new THREE.Scene();
-const camera   = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 60);
-const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-renderer.domElement.id = 'three';
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.xr.enabled = true;
-document.body.appendChild(renderer.domElement);
-
-scene.add(new THREE.HemisphereLight(0xffffff, 0x99a2a7, 1.1));
-const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-sun.position.set(1.4, 3, 1.2);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024,1024);
-sun.shadow.camera.top = sun.shadow.camera.right = 1.6;
-sun.shadow.camera.bottom = sun.shadow.camera.left = -1.6;
-scene.add(sun, sun.target);
-
-function resize(){
-  camera.aspect = innerWidth/innerHeight;
-  if (mode === 'cam') applyCameraFov();
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-}
-addEventListener('resize', resize);
-addEventListener('orientationchange', ()=> setTimeout(resize, 350));
-
-/* =========================================================
-   โมเดลเครื่องซักผ้า (หน่วยเมตร ขนาดจริง)
-   ========================================================= */
-const MODELS = {
-  slim:{ w:0.60, h:0.85, d:0.45, label:'60 × 45 × 85' },
-  std: { w:0.60, h:0.85, d:0.60, label:'60 × 60 × 85' },
-  big: { w:0.70, h:0.90, d:0.68, label:'70 × 68 × 90' }
-};
-const CLEAR = { side:0.02, back:0.05, front:0.55 };
-
-const placed = new THREE.Group();
-placed.visible = false;
-scene.add(placed);
-
-let machine=null, drum=null, doorPivot=null, chassis=null, bodyMat=null, led=null;
-let spec = MODELS.std, finish = 0xf3f5f6, doorOpen = false;
-
-function buildMachine(s, color){
-  const g = new THREE.Group();
-  const { w:W, h:H, d:D } = s;
-  bodyMat     = new THREE.MeshStandardMaterial({ color, roughness:0.5, metalness:0.18 });
-  const dark  = new THREE.MeshStandardMaterial({ color:0x222c33, roughness:0.65 });
-  const metal = new THREE.MeshStandardMaterial({ color:0xb2babf, roughness:0.3, metalness:0.75 });
-  const rub   = new THREE.MeshStandardMaterial({ color:0x3a4247, roughness:0.9 });
-  const glass = new THREE.MeshStandardMaterial({ color:0x8fd4ff, roughness:0.1, metalness:0.1,
-                                                 transparent:true, opacity:0.42 });
-
-  chassis = new THREE.Group(); g.add(chassis);
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(W,H,D), bodyMat);
-  body.position.y = H/2; body.castShadow = true; body.receiveShadow = true;
-  chassis.add(body);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(W+0.008, 0.018, D+0.008), metal);
-  top.position.y = H + 0.005; top.castShadow = true; chassis.add(top);
-
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(W*0.92, H*0.12, 0.012), dark);
-  panel.position.set(0, H*0.845, D/2+0.004); chassis.add(panel);
-  const knob = new THREE.Mesh(new THREE.CylinderGeometry(W*0.075,W*0.075,0.02,20), metal);
-  knob.rotation.x = Math.PI/2; knob.position.set(-W*0.31, H*0.845, D/2+0.014); chassis.add(knob);
-  led = new THREE.Mesh(new THREE.BoxGeometry(W*0.30, H*0.045, 0.008),
-        new THREE.MeshStandardMaterial({ color:0x0d1a16, emissive:0x2bbfa2, emissiveIntensity:0.7 }));
-  led.position.set(W*0.16, H*0.845, D/2+0.012); chassis.add(led);
-
-  const doorR = W*0.31, drumLen = D*0.55;
-  drum = new THREE.Group();
-  drum.position.set(0, H*0.50, D/2 - drumLen/2 - 0.03);
-  chassis.add(drum);
-  const shell = new THREE.Mesh(new THREE.CylinderGeometry(doorR*0.94, doorR*0.94, drumLen, 26, 1, true), metal);
-  shell.rotation.x = Math.PI/2; drum.add(shell);
-  const back = new THREE.Mesh(new THREE.CircleGeometry(doorR*0.94, 26),
-               new THREE.MeshStandardMaterial({ color:0x7f888d, roughness:0.4, metalness:0.6, side:THREE.DoubleSide }));
-  back.position.z = -drumLen/2; drum.add(back);
-  for (let i=0;i<3;i++){
-    const a = i*Math.PI*2/3;
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.035,drumLen*0.86), metal);
-    fin.position.set(Math.cos(a)*doorR*0.8, Math.sin(a)*doorR*0.8, 0);
-    fin.rotation.z = a; drum.add(fin);
-  }
-  [[0xef6f6c,0.05],[0x6c8bef,0.045],[0xf7d774,0.048],[0xffffff,0.04]].forEach((c,i)=>{
-    const b = new THREE.Mesh(new THREE.SphereGeometry(c[1],12,10),
-              new THREE.MeshStandardMaterial({ color:c[0], roughness:0.95 }));
-    b.position.set((i-1.5)*0.05, -doorR*0.45 + (i%2)*0.05, (i%2?0.03:-0.03));
-    drum.add(b);
-  });
-
-  const seal = new THREE.Mesh(new THREE.TorusGeometry(doorR*1.02, 0.022, 8, 28), rub);
-  seal.position.set(0, H*0.50, D/2-0.01); chassis.add(seal);
-
-  doorPivot = new THREE.Group();
-  doorPivot.position.set(-(W/2-0.03), H*0.50, D/2-0.005);
-  chassis.add(doorPivot);
-  const off = W/2-0.03;
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(doorR, 0.028, 10, 30), bodyMat);
-  ring.position.set(off, 0, 0.015); ring.castShadow = true;
-  const pane = new THREE.Mesh(new THREE.SphereGeometry(doorR*0.95, 20, 14, 0, Math.PI*2, 0, Math.PI/2.6), glass);
-  pane.rotation.x = -Math.PI/2; pane.position.set(off, 0, 0.01);
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, doorR*0.7, 0.05), metal);
-  handle.position.set(off + doorR*0.92, 0, 0.02);
-  doorPivot.add(ring, pane, handle);
-  g.userData.swingR = off + doorR + 0.03;
-
-  for (const sx of [-1,1]) for (const sz of [-1,1]){
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.026,0.02,8), rub);
-    foot.position.set(sx*(W/2-0.05), 0.01, sz*(D/2-0.05));
-    chassis.add(foot);
-  }
-  return g;
-}
-
-const floorMarks = new THREE.Group();
-placed.add(floorMarks);
-function rectLine(w,d,z0,mat){
-  const hx=w/2, p=[[-hx,z0-d/2],[hx,z0-d/2],[hx,z0+d/2],[-hx,z0+d/2],[-hx,z0-d/2]]
-    .map(v=>new THREE.Vector3(v[0],0.004,v[1]));
-  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(p), mat);
-  l.computeLineDistances(); return l;
-}
-function buildFloorMarks(s, swingR){
-  floorMarks.clear();
-  const solid  = new THREE.LineBasicMaterial({ color:0x38d6b0 });
-  const dashed = new THREE.LineDashedMaterial({ color:0xf0ad4d, dashSize:0.04, gapSize:0.03 });
-  floorMarks.add(rectLine(s.w, s.d, 0, solid));
-  floorMarks.add(rectLine(s.w+CLEAR.side*2, s.d+CLEAR.back+CLEAR.front,
-                          (CLEAR.front-CLEAR.back)/2, dashed));
-  const pts=[], hx=-(s.w/2-0.03), hz=s.d/2;
-  for (let i=0;i<=36;i++){
-    const a = -(i/36)*(Math.PI*0.61);
-    pts.push(new THREE.Vector3(hx+Math.cos(a)*swingR, 0.004, hz-Math.sin(a)*swingR));
-  }
-  pts.push(new THREE.Vector3(hx,0.004,hz), pts[0].clone());
-  const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), dashed);
-  arc.computeLineDistances(); floorMarks.add(arc);
-}
-
-const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(4,4), new THREE.ShadowMaterial({ opacity:0.3 }));
-shadowPlane.rotation.x = -Math.PI/2; shadowPlane.receiveShadow = true;
-placed.add(shadowPlane);
-
-function loadModel(key){
-  if (machine) placed.remove(machine);
-  spec = MODELS[key];
-  machine = buildMachine(spec, finish);
-  placed.add(machine);
-  buildFloorMarks(spec, machine.userData.swingR);
-  doorOpen = false;
-  $('#door').setAttribute('aria-pressed','false');
-  $('#door').textContent = 'เปิดฝา';
-  $('#dim').textContent = spec.label;
-}
-loadModel('std');
-
-/* วงกลมนำทาง */
-const reticle = new THREE.Group();
-reticle.visible = false;
-reticle.add(new THREE.Mesh(new THREE.RingGeometry(0.085,0.105,36).rotateX(-Math.PI/2),
-            new THREE.MeshBasicMaterial({ color:0x38d6b0 })));
-reticle.add(new THREE.Mesh(new THREE.CircleGeometry(0.012,14).rotateX(-Math.PI/2),
-            new THREE.MeshBasicMaterial({ color:0xffffff })));
-scene.add(reticle);
-
-/* =========================================================
-   โหมดที่ 1 — WebXR hit test (Android + Chrome, จับระนาบพื้นจริง)
-   ========================================================= */
-let mode = null, hasPlaced = false, hitTestSource = null;
-
-async function startXR(){
-  const session = await navigator.xr.requestSession('immersive-ar', {
-    requiredFeatures:['hit-test','local-floor'],
-    optionalFeatures:['dom-overlay'],
-    domOverlay:{ root: $('#overlay') }
-  });
-  mode = 'xr';
-  reticle.matrixAutoUpdate = false;
-  renderer.xr.setReferenceSpaceType('local-floor');
-  await renderer.xr.setSession(session);
-
-  const viewer = await session.requestReferenceSpace('viewer');
-  hitTestSource = await session.requestHitTestSource({ space: viewer });
-
-  $('#intro').classList.add('gone');
-  setStatus('เลื่อนกล้องช้า ๆ ส่องไปที่พื้น จนเห็นวงกลมนำทาง');
-
-  const controller = renderer.xr.getController(0);
-  controller.addEventListener('select', ()=>{
-    if (didDrag || !reticle.visible) return;
-    placeAt(new THREE.Vector3().setFromMatrixPosition(reticle.matrix));
-  });
-  scene.add(controller);
-
-  session.addEventListener('end', ()=>{
-    hitTestSource=null; hasPlaced=false; mode=null;
-    placed.visible=false; reticle.visible=false;
-    $('#dock').classList.remove('on');
-    $('#intro').classList.remove('gone');
-  });
-}
-
-/* =========================================================
-   โหมดที่ 2 — เปิดกล้องด้วย getUserMedia + เซ็นเซอร์เอียง
-   ใช้ได้ทั้ง iPhone และ Android ที่ไม่รองรับ WebXR
-   ========================================================= */
-const video = $('#cam');
-let stream = null, eyeHeight = 1.4, orient = { alpha:0, beta:0, gamma:0, screen:0 }, hasSensor = false;
-
-async function startCamera(){
-  if (!window.isSecureContext){
-    return failCard('หน้าเว็บนี้ไม่ได้เปิดผ่าน https',
-      'เบราว์เซอร์จะไม่ยอมเปิดกล้องถ้าไม่ใช่ https หรือ localhost ให้อัปโหลดไฟล์ขึ้นโฮสต์ที่เป็น https (เช่น GitHub Pages, Netlify, Vercel) หรือใช้ ngrok / cloudflared สร้างลิงก์ https ชั่วคราวจากเครื่องตัวเอง');
-  }
-  // iOS ต้องขอสิทธิ์เซ็นเซอร์จากการกดปุ่มโดยตรง
-  try{
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function'){
-      const res = await DeviceOrientationEvent.requestPermission();
-      hasSensor = (res === 'granted');
-    } else {
-      hasSensor = 'ondeviceorientation' in window;
-    }
-  } catch(e){ hasSensor = false; }
-
-  try{
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio:false,
-      video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } }
+    // ฟังก์ชันเมื่อกดเลือกสินค้า
+    products.forEach(card => {
+      card.addEventListener('click', function() {
+        // ล้างสถานะ active จากปุ่มทั้งหมด
+        products.forEach(p => p.classList.remove('active'));
+        // เพิ่มสถานะ active ให้ปุ่มที่ถูกกด
+        this.classList.add('active');
+        
+        // ดึงลิงก์โมเดลจาก data-src มาใส่ใน viewer
+        const newSrc = this.getAttribute('data-src');
+        viewer.src = newSrc;
+      });
     });
-  } catch(err){
-    const map = {
-      NotAllowedError:'คุณกดไม่อนุญาตให้ใช้กล้อง หรือเบราว์เซอร์บล็อกไว้ ให้ไปที่ไอคอนแม่กุญแจข้าง URL แล้วเปิดสิทธิ์กล้อง จากนั้นรีเฟรชหน้า',
-      NotFoundError:'ไม่พบกล้องบนอุปกรณ์นี้',
-      NotReadableError:'กล้องถูกแอปอื่นใช้งานอยู่ ให้ปิดแอปกล้องหรือแท็บอื่นที่เปิดกล้องค้างไว้',
-      OverconstrainedError:'กล้องหลังไม่รองรับความละเอียดที่ขอ ลองรีเฟรชอีกครั้ง'
-    };
-    return failCard('เปิดกล้องไม่สำเร็จ', map[err.name] || (err.name + ': ' + err.message));
-  }
+  </script>
 
-  video.srcObject = stream;
-  video.classList.add('on');
-  await video.play().catch(()=>{});
-
-  mode = 'cam';
-  reticle.matrixAutoUpdate = true;
-  scene.background = null;
-  camera.position.set(0, eyeHeight, 0);
-  applyCameraFov();
-
-  if (hasSensor) addEventListener('deviceorientation', onOrient, true);
-  addEventListener('deviceorientationabsolute', onOrient, true);
-
-  $('#intro').classList.add('gone');
-  $('#dock').classList.add('on');
-  $('#eyeRow').classList.add('on');
-  setStatus(hasSensor
-    ? 'ถือมือถือตั้งตรง ส่องลงที่พื้น แล้วแตะจอเพื่อวางเครื่อง'
-    : 'อุปกรณ์นี้ไม่ส่งข้อมูลเซ็นเซอร์เอียง ใช้การลากนิ้วเพื่อเล็งแทน แล้วแตะเพื่อวาง');
-}
-
-function onOrient(e){
-  if (e.alpha === null && e.beta === null) return;
-  orient.alpha = (e.alpha || 0) * DEG;
-  orient.beta  = (e.beta  || 0) * DEG;
-  orient.gamma = (e.gamma || 0) * DEG;
-  orient.screen = ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * DEG;
-  hasSensor = true;
-}
-
-// แปลง alpha/beta/gamma เป็นทิศทางกล้อง
-const zee = new THREE.Vector3(0,0,1);
-const _euler = new THREE.Euler();
-const _q0 = new THREE.Quaternion();
-const _q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
-function applyOrientation(){
-  _euler.set(orient.beta, orient.alpha, -orient.gamma, 'YXZ');
-  camera.quaternion.setFromEuler(_euler);
-  camera.quaternion.multiply(_q1);
-  camera.quaternion.multiply(_q0.setFromAxisAngle(zee, -orient.screen));
-  camera.rotateY(yawOffset);          // ปรับทิศเองด้วยการลากนิ้ว
-}
-
-// ประมาณมุมมองกล้องให้ใกล้ของจริง เพื่อให้ขนาดวัตถุสมจริง
-function applyCameraFov(){
-  const track = stream && stream.getVideoTracks()[0];
-  const st = track && track.getSettings ? track.getSettings() : {};
-  const vw = st.width || 1280, vh = st.height || 720;
-  const HFOV = 65 * DEG;                                   // มุมมองแนวนอนของกล้องหลังทั่วไป
-  const vAspect = vw/vh;
-  const VFOV = 2*Math.atan(Math.tan(HFOV/2)/vAspect);
-  const cover = Math.max(innerWidth/vw, innerHeight/vh);
-  const visibleV = Math.min(1, innerHeight/(vh*cover));
-  camera.fov = Math.max(35, Math.min(95, 2*Math.atan(Math.tan(VFOV/2)*visibleV)/DEG));
-  camera.updateProjectionMatrix();
-}
-
-// หาจุดตัดของแนวเล็งกับพื้น (y = 0)
-const floorPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
-const _ray = new THREE.Raycaster();
-const _hit = new THREE.Vector3();
-function aimFloorPoint(){
-  _ray.setFromCamera(new THREE.Vector2(0,-0.15), camera);   // เล็งต่ำกว่ากลางจอเล็กน้อย
-  const p = _ray.ray.intersectPlane(floorPlane, _hit);
-  if (!p) return null;
-  const dist = camera.position.distanceTo(p);
-  return (dist > 0.4 && dist < 8) ? p.clone() : null;
-}
-
-function placeAt(p){
-  placed.position.copy(p);
-  placed.visible = true;
-  sun.target.position.copy(p);
-  if (!hasPlaced){
-    hasPlaced = true;
-    $('#dock').classList.add('on');
-    setStatus('ลากนิ้วซ้าย–ขวาเพื่อหมุนเครื่อง · แตะพื้นจุดอื่นเพื่อย้าย', 4200);
-  }
-}
-
-/* =========================================================
-   โหมดที่ 3 — ดูโมเดลเฉย ๆ ไม่ใช้กล้อง
-   ========================================================= */
-let controls = null;
-function startPreview(){
-  mode = 'preview';
-  $('#intro').classList.add('gone');
-  $('#dock').classList.add('on');
-  setStatus('ลากเพื่อหมุนมุมมอง · หุบสองนิ้วเพื่อซูม', 4000);
-  scene.background = new THREE.Color(0x141c1a);
-  const grid = new THREE.GridHelper(6,24,0x2c3a37,0x1e2825);
-  grid.position.y = 0.001; scene.add(grid);
-  placed.visible = true; hasPlaced = true;
-  camera.position.set(1.1,1.1,1.6);
-  camera.fov = 55; camera.updateProjectionMatrix();
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0,0.45,0);
-  controls.enableDamping = true;
-}
-
-/* =========================================================
-   เลือกโหมดตอนเปิดหน้า
-   ========================================================= */
-const introButtons = $('#introButtons'), introNote = $('#introNote');
-
-(async function boot(){
-  let xrOK = false;
-  if (navigator.xr){
-    try { xrOK = await navigator.xr.isSessionSupported('immersive-ar'); } catch(e){}
-  }
-  const camOK = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  let html = '';
-  if (xrOK) html += '<button class="go" id="bXR">เริ่ม AR แบบจับพื้นจริง</button>';
-  if (camOK) html += '<button class="' + (xrOK ? 'alt' : 'go') + '" id="bCam">เปิดกล้องแล้ววางเครื่อง</button>';
-  html += '<button class="alt" id="bPrev">ดูโมเดล 3 มิติ ไม่ใช้กล้อง</button>';
-  introButtons.innerHTML = html;
-
-  introNote.textContent = xrOK
-    ? 'เครื่องนี้รองรับการจับระนาบพื้น โมเดลจะเกาะพื้นแม่นและไม่ไหลตามเมื่อเดิน'
-    : 'เครื่องนี้ยังไม่รองรับ WebXR (เช่น Safari บน iPhone) โหมดเปิดกล้องจะใช้เซ็นเซอร์เอียงวางโมเดลบนระนาบพื้นสมมติแทน ตำแหน่งจะไหลบ้างเวลาเดิน แต่ดูขนาดเทียบกับห้องได้';
-
-  if (!window.isSecureContext){
-    introNote.textContent = 'หน้านี้ไม่ได้เปิดผ่าน https กล้องจะเปิดไม่ได้ ให้เปิดผ่าน https หรือ http://localhost';
-  }
-
-  const bXR = $('#bXR'); if (bXR) bXR.addEventListener('click', ()=> startXR().catch(e=>{
-    console.error(e); failCard('เข้าโหมด AR ไม่สำเร็จ', String(e.message || e) + ' ลองใช้โหมดเปิดกล้องแทนได้');
-  }));
-  $('#bCam') && $('#bCam').addEventListener('click', ()=> startCamera().catch(e=>{
-    console.error(e); failCard('เปิดกล้องไม่สำเร็จ', String(e.message || e));
-  }));
-  $('#bPrev').addEventListener('click', startPreview);
-  setStatus('เลือกโหมดที่ต้องการเพื่อเริ่ม');
-})();
-
-function failCard(title, detail){
-  $('#intro').classList.remove('gone');
-  $('#introCard').innerHTML =
-    '<h1>' + title + '</h1><div class="warn">' + detail + '</div>' +
-    '<button class="go" id="again">ลองเปิดกล้องอีกครั้ง</button>' +
-    '<button class="alt" id="prev2">ดูโมเดล 3 มิติ ไม่ใช้กล้อง</button>';
-  $('#again').addEventListener('click', ()=> startCamera());
-  $('#prev2').addEventListener('click', startPreview);
-}
-
-/* =========================================================
-   ปุ่มควบคุม + การแตะ/ลาก
-   ========================================================= */
-const statusEl = $('#status');
-let statusTimer = null;
-function setStatus(text, hideAfter){
-  statusEl.textContent = text;
-  statusEl.classList.remove('hidden');
-  clearTimeout(statusTimer);
-  if (hideAfter) statusTimer = setTimeout(()=>statusEl.classList.add('hidden'), hideAfter);
-}
-
-$('#overlay').addEventListener('beforexrselect', e => e.preventDefault());
-
-let dragging=false, didDrag=false, lastX=0, lastY=0, yawOffset=0;
-const surface = renderer.domElement;
-surface.addEventListener('pointerdown', e=>{ dragging=true; didDrag=false; lastX=e.clientX; lastY=e.clientY; });
-addEventListener('pointermove', e=>{
-  if (!dragging) return;
-  const dx = e.clientX - lastX, dy = e.clientY - lastY;
-  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag = true;
-  if (mode === 'cam' && !hasSensor){
-    yawOffset -= dx * 0.004;                     // ไม่มีเซ็นเซอร์: ลากเพื่อเล็ง
-    camera.position.y = eyeHeight;
-  } else if (mode !== 'preview' && hasPlaced){
-    placed.rotation.y += dx * 0.007;             // ลากเพื่อหมุนเครื่อง
-  }
-  lastX = e.clientX; lastY = e.clientY;
-});
-addEventListener('pointerup', ()=>{ dragging=false; setTimeout(()=>{ didDrag=false; }, 80); });
-
-// แตะจอเพื่อวาง (โหมดกล้อง)
-surface.addEventListener('click', ()=>{
-  if (mode !== 'cam' || didDrag) return;
-  const p = aimFloorPoint();
-  if (p) placeAt(p);
-  else setStatus('เล็งให้ต่ำลงมาที่พื้นก่อน แล้วแตะอีกครั้ง', 2500);
-});
-
-document.querySelectorAll('#models button').forEach(b=>{
-  b.addEventListener('click', ()=>{
-    document.querySelectorAll('#models button').forEach(x=>x.setAttribute('aria-pressed','false'));
-    b.setAttribute('aria-pressed','true');
-    loadModel(b.dataset.model);
-  });
-});
-document.querySelectorAll('#finishes .chip').forEach(b=>{
-  b.addEventListener('click', ()=>{
-    document.querySelectorAll('#finishes .chip').forEach(x=>x.setAttribute('aria-pressed','false'));
-    b.setAttribute('aria-pressed','true');
-    finish = Number(b.dataset.color);
-    bodyMat.color.setHex(finish);
-  });
-});
-$('#rotL').addEventListener('click', ()=> placed.rotation.y += Math.PI/12);
-$('#rotR').addEventListener('click', ()=> placed.rotation.y -= Math.PI/12);
-$('#door').addEventListener('click', function(){
-  doorOpen = !doorOpen;
-  this.setAttribute('aria-pressed', String(doorOpen));
-  this.textContent = doorOpen ? 'ปิดฝา' : 'เปิดฝา';
-});
-$('#reset').addEventListener('click', ()=>{
-  if (mode === 'preview'){ placed.rotation.y = 0; return; }
-  placed.visible = false; hasPlaced = false;
-  setStatus('เล็งไปที่พื้นแล้วแตะจอเพื่อวางใหม่');
-});
-$('#fold').addEventListener('click', function(){
-  const d = $('#dock');
-  d.classList.toggle('min');
-  this.textContent = d.classList.contains('min') ? 'ขยาย' : 'ย่อ';
-});
-
-const eye = $('#eye'), eyeOut = $('#eyeOut');
-eye.addEventListener('input', ()=>{
-  eyeHeight = Number(eye.value);
-  eyeOut.textContent = eyeHeight.toFixed(2) + ' ม.';
-});
-const rpmSlider = $('#rpm'), rpmOut = $('#rpmOut');
-rpmSlider.addEventListener('input', ()=> rpmOut.textContent = rpmSlider.value + ' รอบ/นาที');
-
-/* =========================================================
-   ลูปเรนเดอร์
-   ========================================================= */
-let currentRpm = 0, drumAngle = 0, sawFloor = false;
-const clock = new THREE.Clock();
-
-renderer.setAnimationLoop((t, frame)=>{
-  const dt = Math.min(clock.getDelta(), 0.1);
-
-  if (mode === 'xr' && frame && hitTestSource){
-    const ref = renderer.xr.getReferenceSpace();
-    const hits = frame.getHitTestResults(hitTestSource);
-    if (hits.length){
-      reticle.visible = true;
-      reticle.matrix.fromArray(hits[0].getPose(ref).transform.matrix);
-      if (!sawFloor){ sawFloor = true; setStatus('เจอพื้นแล้ว แตะจอตรงจุดที่อยากวาง', 5000); }
-    } else reticle.visible = false;
-  }
-
-  if (mode === 'cam'){
-    if (hasSensor) applyOrientation();
-    camera.position.set(0, eyeHeight, 0);
-    const p = aimFloorPoint();
-    if (p){ reticle.visible = true; reticle.position.copy(p); }
-    else reticle.visible = false;
-  }
-  if (mode === 'preview') reticle.visible = false;
-
-  // มอเตอร์: ไต่รอบขึ้น–ลง แล้วหมุนถัง
-  const target = Number(rpmSlider.value);
-  const rate = target > currentRpm ? 320 : 520;
-  currentRpm += Math.sign(target - currentRpm) * Math.min(Math.abs(target - currentRpm), rate*dt);
-  if (drum){
-    drumAngle = (drumAngle + currentRpm*6*dt) % 360;
-    drum.rotation.z = -drumAngle*DEG;
-  }
-  if (chassis){
-    const amp = Math.pow(Math.min(currentRpm/1400,1),1.8)*0.006;
-    chassis.position.x = (Math.random()-0.5)*amp;
-    chassis.position.y = (Math.random()-0.5)*amp;
-  }
-  if (led) led.material.emissive.setHex(currentRpm > 600 ? 0xf0ad4d : 0x2bbfa2);
-  if (doorPivot){
-    const goal = doorOpen ? -Math.PI*0.61 : 0;
-    doorPivot.rotation.y += (goal - doorPivot.rotation.y) * Math.min(1, dt*6);
-  }
-
-  if (controls) controls.update();
-  renderer.render(scene, camera);
-});
-</script>
 </body>
 </html>
