@@ -1,340 +1,120 @@
 <!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>AR เครื่องซักผ้า — ปรับรอบปั่น</title>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>AR เครื่องซักผ้า (Washing Machine)</title>
+    <!-- นำเข้า A-Frame และ AR.js -->
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+      /* ตกแต่งปุ่มกด UI ให้ทับอยู่บนกล้อง */
+      .ui-container {
+        position: absolute;
+        bottom: 30px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        z-index: 10;
+        pointer-events: none; /* ให้คลิกทะลุได้ยกเว้นที่ปุ่ม */
+      }
+      button {
+        pointer-events: auto;
+        padding: 15px 40px;
+        font-size: 24px;
+        font-weight: bold;
+        background-color: #28a745;
+        color: white;
+        border: 3px solid #ffffff;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        transition: transform 0.1s, background-color 0.3s;
+      }
+      button:active {
+        transform: scale(0.95);
+        background-color: #218838;
+      }
+    </style>
 
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.7/aframe/build/aframe-ar.js"></script>
+    <script>
+      let currentSpeed = 1;
+      
+      // สร้าง Component สำหรับหมุนถังซัก
+      AFRAME.registerComponent('spin-drum', {
+        schema: { speed: {type: 'number', default: 1} },
+        tick: function (time, timeDelta) {
+          // ดึงค่าการหมุนปัจจุบัน
+          let rotation = this.el.getAttribute('rotation');
+          // เพิ่มค่าการหมุนแกน Z ตามความเร็ว (จำลองถังซักฝาหน้า)
+          rotation.z += this.data.speed * (timeDelta / 10); 
+          this.el.setAttribute('rotation', rotation);
+        }
+      });
 
-<style>
-  :root{
-    --panel:#e9ece8;
-    --panel-edge:#c3c9c2;
-    --slate:#18232b;
-    --mint:#2bbfa2;
-    --amber:#e8a33c;
-    --lcd-bg:#0d1a16;
-    --lcd-ink:#7dffcd;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;overflow:hidden;background:#000;
-    font-family:"Trebuchet MS","Noto Sans Thai",Tahoma,sans-serif;color:var(--slate)}
-  a-scene{position:fixed;inset:0}
+      // ฟังก์ชันเมื่อกดปุ่มเปลี่ยนความเร็ว
+      function changeSpeed() {
+        currentSpeed += 3; // เพิ่มความเร็วทีละ 3
+        if (currentSpeed > 10) {
+          currentSpeed = 1; // ถ้ารอบสูงเกินให้กลับมาเริ่มต้น (โหมดซักปกติ)
+        }
+        
+        const drum = document.querySelector('#drum');
+        // อัปเดตค่าความเร็วใน component
+        drum.setAttribute('spin-drum', `speed: ${currentSpeed}`);
+        
+        // เปลี่ยนข้อความปุ่ม
+        let speedText = currentSpeed === 1 ? 'ซักปกติ (1x)' : `ปั่นหมาด (${currentSpeed}x)`;
+        document.getElementById('speed-btn').innerText = speedText;
+      }
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden; font-family: sans-serif;">
+    
+    <!-- ปุ่ม UI ปรับความเร็ว -->
+    <div class="ui-container">
+      <button id="speed-btn" onclick="changeSpeed()">ซักปกติ (1x)</button>
+    </div>
 
-  /* ---- แผงควบคุมแบบหน้าปัดเครื่องซักผ้า ---- */
-  #panel{
-    position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
-    width:min(560px,calc(100% - 20px));
-    background:linear-gradient(#f7f9f6,var(--panel));
-    border:1px solid var(--panel-edge);
-    border-radius:18px;
-    box-shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 #fff;
-    padding:14px 16px 16px;
-    z-index:10;
-  }
-  #panel.tucked{transform:translateX(-50%) translateY(calc(100% - 42px))}
-  #panel{transition:transform .25s ease}
+    <!-- สร้าง Scene AR -->
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;">
+      
+      <!-- ใช้ Marker มาตรฐาน Hiro -->
+      <a-marker preset="hiro">
+        
+        <!-- โมเดลเครื่องซักผ้า (สร้างจากรูปทรงพื้นฐาน) -->
+        <a-entity position="0 0.5 0" rotation="-90 0 0">
+          <!-- ตัวเครื่องภายนอก (สีขาว) -->
+          <a-box position="0 0 0" depth="1" height="1.2" width="1" color="#F4F4F4" shadow></a-box>
+          
+          <!-- แผงควบคุมด้านบน (สีดำ) -->
+          <a-box position="0 0.5 0.45" depth="0.1" height="0.1" width="0.9" color="#222222"></a-box>
+          <a-cylinder position="-0.3 0.5 0.5" rotation="90 0 0" radius="0.03" height="0.05" color="red"></a-cylinder>
+          <a-cylinder position="-0.15 0.5 0.5" rotation="90 0 0" radius="0.03" height="0.05" color="blue"></a-cylinder>
 
-  .head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-  .head h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.2px}
-  .tuck{margin-left:auto;border:1px solid var(--panel-edge);background:#fff;
-    border-radius:10px;width:34px;height:30px;font-size:15px;cursor:pointer;color:var(--slate)}
-
-  .lcd{
-    background:var(--lcd-bg);color:var(--lcd-ink);border-radius:10px;
-    padding:8px 12px;display:flex;align-items:baseline;gap:8px;
-    box-shadow:inset 0 2px 8px rgba(0,0,0,.6);
-  }
-  .lcd b{font-size:30px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:1px}
-  .lcd span{font-size:12px;opacity:.75}
-  .lcd i{margin-left:auto;font-style:normal;font-size:12px;opacity:.9}
-
-  input[type=range]{
-    width:100%;margin:14px 0 4px;height:26px;background:transparent;-webkit-appearance:none;
-  }
-  input[type=range]::-webkit-slider-runnable-track{
-    height:6px;border-radius:3px;background:linear-gradient(90deg,var(--mint),var(--amber));
-  }
-  input[type=range]::-moz-range-track{height:6px;border-radius:3px;
-    background:linear-gradient(90deg,var(--mint),var(--amber))}
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none;width:26px;height:26px;margin-top:-10px;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#fff,#d8ddd7 60%,#aab0a9);
-    border:1px solid #9aa199;box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:grab}
-  input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#fff,#d8ddd7 60%,#aab0a9);
-    border:1px solid #9aa199;cursor:grab}
-  input[type=range]:focus-visible{outline:3px solid var(--mint);outline-offset:4px}
-
-  .ticks{display:flex;justify-content:space-between;font-size:11px;opacity:.6;margin-bottom:10px}
-
-  .modes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-  .modes button{
-    padding:9px 4px;font-size:12.5px;font-family:inherit;color:var(--slate);
-    background:#fff;border:1px solid var(--panel-edge);border-radius:11px;cursor:pointer;
-  }
-  .modes button:hover{background:#f0f3ef}
-  .modes button[aria-pressed="true"]{
-    background:var(--slate);color:#fff;border-color:var(--slate)}
-  .modes button:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
-
-  .row{display:flex;gap:6px;margin-top:8px}
-  .row button{flex:1;padding:8px;font-size:12.5px;font-family:inherit;color:var(--slate);
-    background:#fff;border:1px solid var(--panel-edge);border-radius:11px;cursor:pointer}
-  .row button[aria-pressed="true"]{background:var(--mint);border-color:var(--mint);color:#04231c}
-
-  #hint{
-    position:fixed;top:12px;left:50%;transform:translateX(-50%);
-    background:rgba(13,26,22,.82);color:#e7f6f0;padding:9px 14px;border-radius:12px;
-    font-size:13px;max-width:calc(100% - 24px);text-align:center;z-index:10;line-height:1.5
-  }
-  #hint a{color:var(--lcd-ink)}
-  #hint.off{display:none}
-  @media (prefers-reduced-motion:reduce){#panel{transition:none}}
-</style>
-</head>
-<body>
-
-<a-scene
-  vr-mode-ui="enabled: false"
-  renderer="antialias: true; alpha: true; colorManagement: true"
-  embedded
-  arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; patternRatio: 0.5;">
-
-  <a-assets>
-    <a-mixin id="fin" geometry="primitive: box; width: 0.045; height: 0.045; depth: 0.24"
-             material="color: #b9c1c6; metalness: 0.4; roughness: 0.5"></a-mixin>
-  </a-assets>
-
-  <!-- กล้อง -->
-  <a-entity camera></a-entity>
-
-  <!-- marker: Hiro -->
-  <a-marker id="marker" preset="hiro" smooth="true" smoothCount="6" smoothTolerance="0.01">
-    <a-entity id="machineRoot" washer-machine="rpm: 0">
-
-      <!-- ตัวเครื่อง (สั่นเมื่อรอบสูง) -->
-      <a-entity id="chassis">
-        <a-box position="0 0.5 0" width="0.85" height="1" depth="0.8"
-               material="color: #eef1f3; metalness: 0.15; roughness: 0.65"></a-box>
-        <a-box position="0 0.5 0.405" width="0.83" height="0.98" depth="0.02"
-               material="color: #f8fafb; roughness: 0.5"></a-box>
-        <!-- ฝาบน -->
-        <a-box position="0 1.01 0" width="0.87" height="0.03" depth="0.82"
-               material="color: #d7dde1"></a-box>
-
-        <!-- แผงควบคุมบนตัวเครื่อง -->
-        <a-box position="0 0.86 0.42" width="0.83" height="0.16" depth="0.02"
-               material="color: #26333c"></a-box>
-        <a-cylinder position="-0.28 0.86 0.435" radius="0.05" height="0.02" rotation="90 0 0"
-                    material="color: #cfd6da; metalness: 0.5; roughness: 0.4"></a-cylinder>
-        <a-box id="led" position="0.28 0.86 0.435" width="0.05" height="0.05" depth="0.01"
-               material="color: #2bbfa2; emissive: #2bbfa2; emissiveIntensity: 0.9"></a-box>
-        <a-text id="rpmText" value="0 RPM" align="center" width="1.6"
-                color="#7dffcd" position="0.02 0.86 0.44"></a-text>
-
-        <!-- ประตูกระจก -->
-        <a-torus position="0 0.42 0.43" radius="0.245" radius-tubular="0.035"
-                 segments-tubular="40" material="color: #c8d0d5; metalness: 0.4; roughness: 0.45"></a-torus>
-        <a-circle position="0 0.42 0.437" radius="0.225"
-                  material="color: #63c8ff; opacity: 0.32; transparent: true; side: double"></a-circle>
-
-        <!-- ถังซัก: หมุนรอบแกน Z -->
-        <a-entity id="drum" position="0 0.42 0.3">
-          <a-cylinder radius="0.21" height="0.26" rotation="90 0 0" open-ended="true"
-                      material="color: #9aa6ad; metalness: 0.6; roughness: 0.35; side: double"></a-cylinder>
-          <a-circle radius="0.21" position="0 0 -0.13"
-                    material="color: #7d888e; side: double"></a-circle>
-          <!-- ครีบกวนผ้า -->
-          <a-entity mixin="fin" position="0 0.17 0"></a-entity>
-          <a-entity mixin="fin" position="0.147 -0.085 0" rotation="0 0 -60"></a-entity>
-          <a-entity mixin="fin" position="-0.147 -0.085 0" rotation="0 0 60"></a-entity>
-          <!-- ผ้าในถัง -->
-          <a-sphere radius="0.055" position="0.09 -0.06 0.03" material="color: #ef6f6c"></a-sphere>
-          <a-sphere radius="0.048" position="-0.07 -0.09 -0.02" material="color: #6c8bef"></a-sphere>
-          <a-sphere radius="0.052" position="0.02 -0.12 0.05" material="color: #f7d774"></a-sphere>
-          <a-sphere radius="0.042" position="-0.11 0.02 0.04" material="color: #ffffff"></a-sphere>
+          <!-- กรอบฝาหน้าเครื่องซักผ้า -->
+          <a-torus position="0 0 0.5" rotation="0 0 0" radius="0.36" radius-tubular="0.03" color="#CCCCCC"></a-torus>
+          
+          <!-- กระจกฝาหน้า (ใส) -->
+          <a-cylinder position="0 0 0.5" rotation="90 0 0" radius="0.35" height="0.02" color="#87CEEB" opacity="0.6"></a-cylinder>
+          
+          <!-- ถังซักด้านในที่หมุนได้ (ใส่ลวดลายให้เห็นการหมุนชัดขึ้น) -->
+          <a-cylinder id="drum" 
+                      spin-drum="speed: 1" 
+                      position="0 0 0.4" 
+                      rotation="90 0 0" 
+                      radius="0.34" 
+                      height="0.8" 
+                      color="#AAAAAA"
+                      segments-radial="8"> <!-- ทำเป็น 8 เหลี่ยมจะเห็นการหมุนชัดเจน -->
+          </a-cylinder>
         </a-entity>
-      </a-entity>
+        
+      </a-marker>
 
-      <!-- ขาตั้ง -->
-      <a-box position="-0.33 0.015 0.3" width="0.12" height="0.03" depth="0.12" material="color:#4a545b"></a-box>
-      <a-box position="0.33 0.015 0.3" width="0.12" height="0.03" depth="0.12" material="color:#4a545b"></a-box>
-      <a-box position="-0.33 0.015 -0.3" width="0.12" height="0.03" depth="0.12" material="color:#4a545b"></a-box>
-      <a-box position="0.33 0.015 -0.3" width="0.12" height="0.03" depth="0.12" material="color:#4a545b"></a-box>
-    </a-entity>
-  </a-marker>
+      <!-- กล้อง AR -->
+      <a-entity camera></a-entity>
+    </a-scene>
 
-  <!-- จุดวางเครื่องตอนเปิดโหมดทดสอบ (ไม่ใช้ marker) -->
-  <a-entity id="previewAnchor" position="0 -0.9 -2.6" rotation="0 -20 0"></a-entity>
-
-  <a-entity light="type: hemisphere; color: #ffffff; groundColor: #99a; intensity: 0.9"></a-entity>
-  <a-entity light="type: directional; intensity: 0.7" position="1 2 1.5"></a-entity>
-</a-scene>
-
-<div id="hint">
-  เล็งกล้องไปที่ marker <b>Hiro</b> เพื่อให้เครื่องซักผ้าปรากฏ ·
-  <a href="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" target="_blank" rel="noopener">เปิดภาพ marker</a>
-</div>
-
-<div id="panel">
-  <div class="head">
-    <h1>รอบการปั่น</h1>
-    <button class="tuck" id="tuck" aria-label="ย่อแผงควบคุม">▾</button>
-  </div>
-
-  <div class="lcd">
-    <b id="rpmNow">0</b><span>รอบ/นาที</span><i id="state">หยุด</i>
-  </div>
-
-  <input id="rpm" type="range" min="0" max="1400" step="10" value="0"
-         aria-label="ตั้งรอบการปั่น หน่วยรอบต่อนาที">
-  <div class="ticks"><span>0</span><span>400</span><span>800</span><span>1400</span></div>
-
-  <div class="modes">
-    <button data-rpm="0" aria-pressed="true">แช่</button>
-    <button data-rpm="45" aria-pressed="false">ซัก</button>
-    <button data-rpm="60" aria-pressed="false">ล้าง</button>
-    <button data-rpm="800" aria-pressed="false">ปั่นหมาด</button>
-    <button data-rpm="1400" aria-pressed="false">ปั่นแห้ง</button>
-  </div>
-
-  <div class="row">
-    <button id="sound" aria-pressed="false">เปิดเสียงมอเตอร์</button>
-    <button id="preview" aria-pressed="false">ดูโดยไม่ใช้ marker</button>
-  </div>
-</div>
-
-<script>
-/* ---------- คอมโพเนนต์เครื่องซักผ้า ---------- */
-AFRAME.registerComponent('washer-machine', {
-  schema: { rpm: { type: 'number', default: 0 } },  // rpm เป้าหมาย
-  init: function () {
-    this.angle = 0;
-    this.current = 0;                                 // rpm จริง (ค่อย ๆ ไต่)
-    this.drum    = this.el.querySelector('#drum');
-    this.chassis = this.el.querySelector('#chassis');
-    this.led     = this.el.querySelector('#led');
-    this.label   = this.el.querySelector('#rpmText');
-    this._lastLabel = -1;
-  },
-  tick: function (time, dt) {
-    if (!dt) return;
-    var d = Math.min(dt, 100) / 1000;
-
-    // ไต่รอบขึ้น/ลงแบบมอเตอร์จริง: เร่งช้ากว่าตอนผ่อน
-    var target = this.data.rpm;
-    var rate = (target > this.current) ? 320 : 520;   // rpm ต่อวินาที
-    var diff = target - this.current;
-    var step = Math.sign(diff) * Math.min(Math.abs(diff), rate * d);
-    this.current += step;
-
-    // หมุนถัง: rpm -> องศาต่อวินาที = rpm * 6
-    this.angle = (this.angle + this.current * 6 * d) % 360;
-    this.drum.object3D.rotation.z = -THREE.MathUtils.degToRad(this.angle);
-
-    // สั่นตามรอบ (เริ่มชัดเมื่อเกินรอบเรโซแนนซ์)
-    var amp = Math.pow(Math.min(this.current / 1400, 1), 1.8) * 0.022;
-    var p = this.chassis.object3D.position;
-    p.x = (Math.random() - 0.5) * amp;
-    p.y = (Math.random() - 0.5) * amp;
-    this.chassis.object3D.rotation.z = (Math.random() - 0.5) * amp * 0.5;
-
-    // ไฟสถานะ + ตัวเลขบนเครื่อง
-    var shown = Math.round(this.current / 5) * 5;
-    if (shown !== this._lastLabel) {
-      this._lastLabel = shown;
-      this.label.setAttribute('value', shown + ' RPM');
-      var c = shown > 600 ? '#e8a33c' : (shown > 0 ? '#2bbfa2' : '#44525c');
-      this.led.setAttribute('material', 'color', c);
-      this.led.setAttribute('material', 'emissive', c);
-      if (window.onWasherTick) window.onWasherTick(shown);
-    }
-  }
-});
-
-/* ---------- แผงควบคุม ---------- */
-var machine  = document.querySelector('#machineRoot');
-var slider   = document.querySelector('#rpm');
-var rpmNow   = document.querySelector('#rpmNow');
-var stateEl  = document.querySelector('#state');
-var modeBtns = Array.prototype.slice.call(document.querySelectorAll('.modes button'));
-
-function setRpm(v, fromButton) {
-  v = Math.max(0, Math.min(1400, Math.round(v)));
-  machine.setAttribute('washer-machine', 'rpm', v);
-  slider.value = v;
-  modeBtns.forEach(function (b) {
-    b.setAttribute('aria-pressed', String(fromButton && Number(b.dataset.rpm) === v));
-  });
-  setMotor(v);
-}
-
-slider.addEventListener('input', function () { setRpm(Number(slider.value), false); });
-modeBtns.forEach(function (b) {
-  b.addEventListener('click', function () { setRpm(Number(b.dataset.rpm), true); });
-});
-
-// ตัวเลขบนจอ LCD อัปเดตจากรอบจริง ไม่ใช่ค่าที่ตั้งไว้
-window.onWasherTick = function (rpm) {
-  rpmNow.textContent = rpm;
-  var target = Number(slider.value);
-  stateEl.textContent = rpm === 0 ? 'หยุด'
-    : (Math.abs(rpm - target) > 20 ? (rpm < target ? 'กำลังเร่ง' : 'กำลังผ่อน')
-    : (rpm > 600 ? 'ปั่นแห้ง' : 'กำลังซัก'));
-  if (motor) {
-    motor.osc.frequency.setTargetAtTime(38 + rpm * 0.16, actx.currentTime, 0.08);
-    motor.gain.gain.setTargetAtTime(rpm === 0 ? 0 : 0.03 + rpm / 1400 * 0.07, actx.currentTime, 0.15);
-  }
-};
-
-/* ---------- เสียงมอเตอร์ (WebAudio) ---------- */
-var actx = null, motor = null;
-document.querySelector('#sound').addEventListener('click', function () {
-  var on = this.getAttribute('aria-pressed') === 'true';
-  if (on) { stopMotor(); this.setAttribute('aria-pressed', 'false'); this.textContent = 'เปิดเสียงมอเตอร์'; }
-  else    { startMotor(); this.setAttribute('aria-pressed', 'true');  this.textContent = 'ปิดเสียงมอเตอร์'; }
-});
-function startMotor() {
-  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-  actx.resume();
-  var osc = actx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 40;
-  var lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
-  var gain = actx.createGain(); gain.gain.value = 0;
-  osc.connect(lp).connect(gain).connect(actx.destination);
-  osc.start();
-  motor = { osc: osc, gain: gain };
-  setMotor(Number(slider.value));
-}
-function stopMotor() { if (motor) { motor.gain.gain.value = 0; motor.osc.stop(); motor = null; } }
-function setMotor(rpm) { /* ค่าจริงถูกอัปเดตใน onWasherTick */ }
-
-/* ---------- โหมดทดสอบ: แสดงเครื่องโดยไม่ต้องมี marker ---------- */
-var previewBtn = document.querySelector('#preview');
-previewBtn.addEventListener('click', function () {
-  var on = this.getAttribute('aria-pressed') === 'true';
-  var anchor = document.querySelector('#previewAnchor');
-  var marker = document.querySelector('#marker');
-  if (on) { marker.appendChild(machine); this.setAttribute('aria-pressed', 'false'); this.textContent = 'ดูโดยไม่ใช้ marker'; }
-  else    { anchor.appendChild(machine);  this.setAttribute('aria-pressed', 'true');  this.textContent = 'กลับไปใช้ marker'; }
-  document.querySelector('#hint').classList.toggle('off', !on);
-});
-
-/* ---------- ซ่อนคำแนะนำเมื่อเจอ marker + ย่อแผง ---------- */
-document.querySelector('#marker').addEventListener('markerFound', function () {
-  document.querySelector('#hint').classList.add('off');
-});
-document.querySelector('#marker').addEventListener('markerLost', function () {
-  if (previewBtn.getAttribute('aria-pressed') !== 'true')
-    document.querySelector('#hint').classList.remove('off');
-});
-document.querySelector('#tuck').addEventListener('click', function () {
-  var panel = document.querySelector('#panel');
-  panel.classList.toggle('tucked');
-  this.textContent = panel.classList.contains('tucked') ? '▴' : '▾';
-});
-</script>
-</body>
+  </body>
 </html>
